@@ -2,31 +2,14 @@ import { RunTaskAsync } from '../engine/core/taskrunner.js';
 import { SubCoord3D } from '../engine/geometry/coord3d.js';
 import { GetBoundingBox, IsTwoManifold } from '../engine/model/modelutils.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
-import { Property, PropertyToString, PropertyType } from '../engine/model/property.js';
+import { Property, PropertyToString, PropertyType, PropertyGroup } from '../engine/model/property.js';
 import { AddDiv, AddDomElement, ClearDomElement } from '../engine/viewer/domutils.js';
 import { SidebarPanel } from './sidebarpanel.js';
 import { CreateInlineColorCircle } from './utils.js';
 import { GetFileName, IsUrl } from '../engine/io/fileutils.js';
 import { MaterialType } from '../engine/model/material.js';
 import { RGBColorToHexString } from '../engine/model/color.js';
-import { Unit } from '../engine/model/unit.js';
-
-function UnitToString (unit)
-{
-    switch (unit) {
-        case Unit.Millimeter:
-            return 'Millimeter';
-        case Unit.Centimeter:
-            return 'Centimeter';
-        case Unit.Meter:
-            return 'Meter';
-        case Unit.Inch:
-            return 'Inch';
-        case Unit.Foot:
-            return 'Foot';
-    }
-    return 'Unknown';
-}
+import { AddNumberInput } from './utils.js';
 
 export class SidebarDetailsPanel extends SidebarPanel
 {
@@ -45,18 +28,70 @@ export class SidebarDetailsPanel extends SidebarPanel
         return 'details';
     }
 
-    AddObject3DProperties (model, object3D)
+    AddTextInput (parentElement, className, onChange)
+    {
+        let textInput = AddDomElement (parentElement, 'input', className);
+        textInput.setAttribute ('type', 'text');
+        let onChangeTimeout = null;
+        textInput.addEventListener ('input', () => {
+            if (onChange) {
+                if (onChangeTimeout !== null) {
+                    clearTimeout (onChangeTimeout);
+                }
+                onChangeTimeout = setTimeout (() => {
+                    onChange (textInput.value);
+                }, 1000);
+            }
+        });
+        return textInput;
+    }
+
+    /**
+     * Creates a text input box.
+     * @param {*} parentDiv The parent division to attach the input box to.
+     * @param {*} text      The name of the input box to add.
+     * @param {*} onChange  The function to call upon changing the input box.
+     * @returns The text input (may have to use numberInput.value).
+     */
+    GetTextInput (parentDiv, text, onChange)
+    {
+        let line = AddDiv (parentDiv, 'ov_property_table_row');
+        AddDiv (line, 'ov_snapshot_dialog_param_name', text);
+        let textInput = this.AddTextInput (line, 'ov_dialog_text', onChange);
+        textInput.classList.add ('ov_snapshot_dialog_param_value');
+        textInput.addEventListener ('focus', () => {
+            textInput.setSelectionRange (0, textInput.value.length);
+        });
+        return textInput;
+    }
+
+    /**
+     * Creates a number input box.
+     * @param {*} parentDiv The parent division to attach the input box to.
+     * @param {*} text      The name of the input box to add.
+     * @param {*} onChange  The function to call upon changing the input box.
+     * @returns The number input (may have to use numberInput.value).
+     */
+    GetNumberInput (parentDiv, text, onChange) // Yoinked from snapshotdialog.js
+    {
+        let line = AddDiv (parentDiv, 'ov_property_table_row');
+        AddDiv (line, 'ov_snapshot_dialog_param_name', text);
+        let numberInput = AddNumberInput (line, 'ov_dialog_text', onChange);
+        numberInput.classList.add ('ov_snapshot_dialog_param_value');
+        numberInput.addEventListener ('focus', () => {
+            numberInput.setSelectionRange (0, numberInput.value.length);
+        });
+        return numberInput;
+    }
+
+    AddObject3DProperties (object3D)
     {
         this.Clear ();
         let table = AddDiv (this.contentDiv, 'ov_property_table');
         let boundingBox = GetBoundingBox (object3D);
         let size = SubCoord3D (boundingBox.max, boundingBox.min);
-        let unit = model.GetUnit ();
         this.AddProperty (table, new Property (PropertyType.Integer, 'Vertices', object3D.VertexCount ()));
         this.AddProperty (table, new Property (PropertyType.Integer, 'Triangles', object3D.TriangleCount ()));
-        if (unit !== Unit.Unknown) {
-            this.AddProperty (table, new Property (PropertyType.Text, 'Unit', UnitToString (unit)));
-        }
         this.AddProperty (table, new Property (PropertyType.Number, 'Size X', size.x));
         this.AddProperty (table, new Property (PropertyType.Number, 'Size Y', size.y));
         this.AddProperty (table, new Property (PropertyType.Number, 'Size Z', size.z));
@@ -71,15 +106,35 @@ export class SidebarDetailsPanel extends SidebarPanel
             const surfaceArea = CalculateSurfaceArea (object3D);
             return new Property (PropertyType.Number, null, surfaceArea);
         });
+        if (object3D.PropertyGroupCount () === 0){ // Add a bunch of properties if none are already present.
+            let testPropertyGroup = new PropertyGroup ('Test group');
+            testPropertyGroup.AddProperty (new Property (PropertyType.Text, 'Equipment name', 'placeholder'));
+            testPropertyGroup.AddProperty (new Property (PropertyType.Text, 'Tool code', 'placeholder'));
+            testPropertyGroup.AddProperty (new Property (PropertyType.Text, 'Process name', 'placeholder'));
+            testPropertyGroup.AddProperty (new Property (PropertyType.Integer, 'Processing time', 0));
+            object3D.AddPropertyGroup(testPropertyGroup);
+        }
         if (object3D.PropertyGroupCount () > 0) {
             let customTable = AddDiv (this.contentDiv, 'ov_property_table ov_property_table_custom');
             for (let i = 0; i < object3D.PropertyGroupCount (); i++) {
-                const propertyGroup = object3D.GetPropertyGroup (i);
+                let propertyGroup = object3D.GetPropertyGroup (i);
+                let inputs = [];
+                for (let j = 0; j < propertyGroup.PropertyCount (); j++) {
+                    let property = propertyGroup.GetProperty (j);
+                    if (property.GetType()===PropertyType.Integer){
+                        inputs.push(this.GetNumberInput (customTable, property.GetName(), (val) => {propertyGroup.EditProperty(j, val)}));
+                    }
+                    if (property.GetType()===PropertyType.Text){
+                        inputs.push(this.GetTextInput (customTable, property.GetName(), (val) => {propertyGroup.EditProperty(j, val)}));
+                    }
+                    inputs[j].value = propertyGroup.GetProperty(j).GetValue();
+                }
+                /*
                 this.AddPropertyGroup (customTable, propertyGroup);
                 for (let j = 0; j < propertyGroup.PropertyCount (); j++) {
                     const property = propertyGroup.GetProperty (j);
                     this.AddPropertyInGroup (customTable, property);
-                }
+                }*/
             }
         }
         this.Resize ();
