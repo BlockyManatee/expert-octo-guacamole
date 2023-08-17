@@ -20,6 +20,43 @@ export class Property
         this.value = value;
     }
 
+    /**
+     * Returns a property with a new value.
+     * @param {*} newValue The new value to set the property to. MAKE SURE THE TYPES MATCH.
+     * @returns The new property.
+     */
+    CloneEdited (newValue)
+    {
+        return new Property(this.type, this.name, newValue);
+    }
+
+    /**
+     * Returns the value of the property.
+     * @returns The value of the property.
+     */
+    GetValue()
+    {
+        return this.value;
+    }
+
+    /**
+     * Returns the type of the property.
+     * @returns The type of the property.
+     */
+    GetType()
+    {
+        return this.type;
+    }
+
+    /**
+     * Returns the name of the property.
+     * @returns The name of the property.
+     */
+    GetName()
+    {
+        return this.name;
+    }
+
     Clone ()
     {
         const clonable = (this.type === PropertyType.Color);
@@ -52,6 +89,25 @@ export class PropertyGroup
     GetProperty (index)
     {
         return this.properties[index];
+    }
+
+    /**
+     * Returns all the properties of the property group.
+     * @returns {Array} An array of all the properties in the property group.
+     */
+    GetAllProperties ()
+    {
+        return this.properties;
+    }
+
+    /**
+     * Edits the value of a property in the group at a given index. BE CAREFUL TO CHECK THE TYPE.
+     * @param {*} index The index of the property to change.
+     * @param {*} value The new value for the edited property to hold.
+     */
+    EditProperty (index, value)
+    {
+        this.properties[index] = this.properties[index].CloneEdited(value);
     }
 
     Clone ()
