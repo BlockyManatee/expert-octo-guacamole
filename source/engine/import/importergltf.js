@@ -641,14 +641,21 @@ export class ImporterGltf extends ImporterBase
             }
         }
 
-        this.ImportProperties (this.model, gltf.asset, 'Asset properties');
+        this.ImportProperties (this.model, gltf.asset.extras, 'Asset properties'); // Changed from gltf.asset to import extras specifically.
         this.ImportScene (gltf);
     }
 
+    /**
+     * Imports the properties from the gltf file.
+     * @param {*} modelObject       The object to add the properties to.
+     * @param {*} gltfObject        The array of properties.
+     * @param {*} propertyGroupName The name of the property group.
+     * @returns Whether or not a property group is added.
+     */
     ImportProperties (modelObject, gltfObject, propertyGroupName)
     {
         if (gltfObject === undefined || gltfObject === null) {
-            return;
+            return 0;
         }
 
         let propertyGroup = new PropertyGroup (propertyGroupName);
@@ -670,12 +677,18 @@ export class ImporterGltf extends ImporterBase
                 }
             }
         }
+        if (Array.isArray(gltfObject)){
+            for (let i=0; i<gltfObject.length; i++){
+                propertyGroup.AddProperty(new Property (gltfObject[i].type, gltfObject[i].name, gltfObject[i].value));
+            }
+        }
 
         if (propertyGroup.PropertyCount () === 0) {
-            return;
+            return 1;
         }
 
         modelObject.AddPropertyGroup (propertyGroup);
+        return 2;
     }
 
     GetDefaultScene (gltf)
