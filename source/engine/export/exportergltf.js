@@ -199,11 +199,17 @@ export class ExporterGltf extends ExporterBase
 
         exporterModel.EnumerateMeshes ((mesh) => {
             let buffer = ConvertMeshToMeshBuffer (mesh);
+            // Adds the properties of the first property group of the mesh to the extras.
+            let properties = [];
+            if (mesh.PropertyGroupCount()!==0){
+                properties = mesh.GetPropertyGroup(0).GetAllProperties();
+            }
             meshDataArr.push ({
                 name : mesh.GetName (),
                 buffer : buffer,
                 offsets : [],
-                sizes : []
+                sizes : [],
+                extras: properties
             });
         });
 
@@ -347,10 +353,15 @@ export class ExporterGltf extends ExporterBase
             }
         }
 
+        let properties = [];
+        if (exporterModel.GetModel().PropertyGroupCount()!==0){
+            properties = exporterModel.GetModel().GetPropertyGroup(0).GetAllProperties();
+        }
         let mainJson = {
             asset : {
                 generator : 'https://3dviewer.net',
-                version : '2.0'
+                version : '2.0',
+                extras: properties
             },
             scene : 0,
             scenes : [
@@ -372,7 +383,8 @@ export class ExporterGltf extends ExporterBase
         for (let meshData of meshDataArr) {
             let jsonMesh = {
                 name : this.GetExportedMeshName (meshData.name),
-                primitives : []
+                primitives : [],
+                extras: meshData.extras
             };
 
             let primitives = meshData.buffer.primitives;
